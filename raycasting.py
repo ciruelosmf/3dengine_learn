@@ -1,7 +1,7 @@
 import pygame as pg
 import math
 from settings import *
-
+import random
 
 class RayCasting:
     def __init__(self, game):
@@ -68,15 +68,20 @@ class RayCasting:
                 offset = (1 - x_hor) if sin_a > 0 else x_hor
 
             # remove fishbowl effect
-            #depth *= math.cos(self.game.player.angle - ray_angle)
+            depth *= math.cos(self.game.player.angle - ray_angle)
+            color = [random.randint(0, 255)/ (1+depth**4 *0.0002)] *3
 
             # projection
-            #proj_height = SCREEN_DIST / (depth + 0.0001)
-            pg.draw.line(self.game.screen, "yellow", (ox*100, oy*100),
-                        (ox*100 + 100 * depth  * cos_a ,
-                         oy*100 + 100 * depth  * sin_a ),2) 
+            proj_height = SCREEN_DIST / (depth + 0.0001)
+
+            #ray
+            #pg.draw.line(self.game.screen, "blue", (ox*100, oy*100), (ox*100 + 100 * depth  * cos_a ,  oy*100 + 100 * depth  * sin_a ),2) 
+
+
             # ray casting result
             #self.ray_casting_result.append((depth, proj_height, texture, offset))
+            pg.draw.rect(self.game.screen, color, (ray* SCALE, HALF_HEIGHT - proj_height // 2  , SCALE, proj_height))
+
 
             ray_angle += DELTA_ANGLE
 
