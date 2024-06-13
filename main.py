@@ -3,9 +3,9 @@ import pygame as pg
 import sys
 from settings import *
 from map import *
+from raycasting import *
+ 
 from player import *
-
-
 # Define the Sphere class
 class Game:
     def __init__(self):
@@ -21,10 +21,12 @@ class Game:
     def new_game(self):
         self.map = Map(self)
         self.player = Player(self)
+        self.raycasting = RayCasting(self)
 
 
     def update(self):
         self.player.update()
+        self.raycasting.update()
 
         pg.display.flip()
         self.delta_time  = 1

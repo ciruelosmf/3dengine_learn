@@ -1,69 +1,84 @@
-import numpy as np
-import pygame
-import sys
+import pygame as pg
+import math
+from settings import *
 
-# Define the Sphere class
-class Sphere:
-    def __init__(self, center, radius, color):
-        self.center = np.array(center)
-        self.radius = radius
-        self.color = color
 
-    def intersect(self, ray_origin, ray_direction):
-        # Calculate the intersection of the ray with the sphere
-        L = self.center - ray_origin
-        tca = np.dot(L, ray_direction)
-        d2 = np.dot(L, L) - tca * tca
-        if d2 > self.radius**2:
-            return None
-        thc = np.sqrt(self.radius**2 - d2)
-        t0 = tca - thc
-        t1 = tca + thc
-        if t0 > 0 and t1 > 0:
-            return min(t0, t1)
-        return None
+class RayCasting:
+    def __init__(self, game):
+        self.game = game
+        self.ray_casting_result = []
+        self.objects_to_render = []
+        #self.textures = self.game.object_renderer.wall_textures
 
-# Initialize the scene with some spheres
-objects = [
-    Sphere([0, 0, 20], 5, (255, 0, 0)),
-    Sphere([5, -1, 15], 2, (0, 255, 0)),
-    Sphere([-5, 0, 25], 3, (0, 0, 255))
-]
+    def ray_cast(self):
+        self.ray_casting_result = []
+        texture_vert, texture_hor = 1, 1
+        ox, oy = self.game.player.pos
+        x_map, y_map = self.game.player.map_pos
 
-# Initialize Pygame
-pygame.init()
-width, height = 800, 600
-screen = pygame.display.set_mode((width, height))
-pygame.display.set_caption('Simple Raycaster')
+        ray_angle = self.game.player.angle - HALF_FOV + 0.0001
+        for ray in range(NUM_RAYS):
+            sin_a = math.sin(ray_angle)
+            cos_a = math.cos(ray_angle)
 
-# Render function
-def render():
-    aspect_ratio = width / height
-    fov = np.pi / 12  # Field of view
+            # horizontals
+            y_hor, dy = (y_map + 1, 1) if sin_a > 0 else (y_map - 1e-6, -1)
 
-    for y in range(height):
-        for x in range(width):
-            # Normalize screen coordinates
-            px = (2 * (x + 0.5) / width - 1) * np.tan(fov / 2) * aspect_ratio
-            py = (1 - 2 * (y + 0.5) / height) * np.tan(fov / 2)
-            ray_direction = np.array([px, py, -1]).astype(np.float32)
-            ray_direction /= np.linalg.norm(ray_direction)  # Normalize the direction
+            depth_hor = (y_hor - oy) / sin_a
+            x_hor = ox + depth_hor * cos_a
 
-            color = (0, 0, 0)
-            min_distance = np.inf
-            for obj in objects:
-                distance = obj.intersect(np.array([0, 0, 0]), ray_direction)
-                if distance and distance < min_distance:
-                    min_distance = distance
-                    color = obj.color
-            screen.set_at((x, y), color)
+            delta_depth = dy / sin_a
+            dx = delta_depth * cos_a
 
-# Main loop
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
+            for i in range(MAX_DEPTH):
+                tile_hor = int(x_hor), int(y_hor)
+                if tile_hor in self.game.map.world_map:
+                    texture_hor = self.game.map.world_map[tile_hor]
+                    break
+                x_hor += dx
+                y_hor += dy
+                depth_hor += delta_depth
 
-    render()
-    pygame.display.flip()
+            # verticals
+            x_vert, dx = (x_map + 1, 1) if cos_a > 0 else (x_map - 1e-6, -1)
+
+            depth_vert = (x_vert - ox) / cos_a
+            y_vert = oy + depth_vert * sin_a
+
+            delta_depth = dx / cos_a
+            dy = delta_depth * sin_a
+
+            for i in range(MAX_DEPTH):
+                tile_vert = int(x_vert), int(y_vert)
+                if tile_vert in self.game.map.world_map:
+                    texture_vert = self.game.map.world_map[tile_vert]
+                    break
+                x_vert += dx
+                y_vert += dy
+                depth_vert += delta_depth
+
+            # depth, texture offset
+            if depth_vert < depth_hor:
+                depth, texture = depth_vert, texture_vert
+                y_vert %= 1
+                offset = y_vert if cos_a > 0 else (1 - y_vert)
+            else:
+                depth, texture = depth_hor, texture_hor
+                x_hor %= 1
+                offset = (1 - x_hor) if sin_a > 0 else x_hor
+
+            # remove fishbowl effect
+            #depth *= math.cos(self.game.player.angle - ray_angle)
+
+            # projection
+            #proj_height = SCREEN_DIST / (depth + 0.0001)
+            pg.draw.line(self.game.screen, "yellow", (ox*100, oy*100),
+                        (ox*100 + 100 * depth  * cos_a ,
+                         oy*100 + 100 * depth  * sin_a ),2) 
+            # ray casting result
+            #self.ray_casting_result.append((depth, proj_height, texture, offset))
+
+            ray_angle += DELTA_ANGLE
+
+    def update(self):
+        self.ray_cast()
